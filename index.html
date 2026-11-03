@@ -6,7 +6,7 @@
 html,body{margin:0;height:100%;overflow:hidden;background:#000;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
 #stage{position:fixed;inset:0;overflow:hidden;background:#000}
 #hud{position:fixed;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:10;display:flex;flex-direction:column;gap:8px;max-width:640px;margin:0 auto;color:#fff}
-#sub{background:rgba(10,12,20,.82);border-radius:14px;padding:12px 14px;font-size:17px;line-height:1.35}
+#sub{background:rgba(10,12,20,.7);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:12px 16px;font-size:17px;line-height:1.35;box-shadow:0 6px 24px rgba(0,0,0,.35)}
 #who{display:block;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px}
 button{background:#d9774e;color:#fff;border:0;border-radius:12px;padding:14px;font-size:16px;font-weight:600}
 #hud a{color:#9fc4ff;font-size:13px;text-align:center}
@@ -19,31 +19,41 @@ button{background:#d9774e;color:#fff;border:0;border-radius:12px;padding:14px;fo
 <script src="https://cdn.jsdelivr.net/npm/@ar-js-org/ar.js@3.4.5/three.js/build/ar-threex.js"></script>
 <script>
 const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
-renderer.setClearColor(0x000000,0);renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+renderer.setClearColor(0x000000,0);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.2;renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
 Object.assign(renderer.domElement.style,{position:'absolute',top:'0',left:'0',zIndex:'5'});
 const stage=document.getElementById('stage');stage.appendChild(renderer.domElement);
 const scene=new THREE.Scene(),camera=new THREE.Camera();scene.add(camera);
-scene.add(new THREE.AmbientLight(0xffffff,.75));
-const dl=new THREE.DirectionalLight(0xffffff,.9);dl.position.set(1,3,2);scene.add(dl);
 const root=new THREE.Group();root.visible=false;scene.add(root);
+scene.add(new THREE.HemisphereLight(0xcfe0ff,0x3a2f28,.85));
+const key=new THREE.DirectionalLight(0xfff0dc,2.1);key.position.set(1.4,3,1.8);key.castShadow=true;key.shadow.mapSize.set(2048,2048);
+const sc=key.shadow.camera;sc.left=sc.bottom=-1.3;sc.right=sc.top=1.3;sc.near=.2;sc.far=8;key.shadow.bias=-.0004;key.shadow.normalBias=.012;key.shadow.radius=4;
+root.add(key);root.add(key.target);
+const rim=new THREE.DirectionalLight(0x8fb8ff,1.1);rim.position.set(-2,1.6,-2.2);root.add(rim);root.add(rim.target);
+const catcher=new THREE.Mesh(new THREE.PlaneGeometry(3,3),new THREE.ShadowMaterial({opacity:.4}));catcher.rotation.x=-Math.PI/2;catcher.position.y=.002;catcher.receiveShadow=true;root.add(catcher);
 const S=new THREE.Group();S.scale.setScalar(.15);root.add(S);
-const M=c=>new THREE.MeshStandardMaterial({color:c,roughness:.75});
+function RB(w,h,d,r){r=Math.min(r||.05,Math.min(w,h,d)*.45);const g=new THREE.BoxGeometry(w,h,d,4,4,4),p=g.attributes.position,u=g.attributes.uv,v=new THREE.Vector3(),c=new THREE.Vector3(),hw=w/2-r,hh=h/2-r,hd=d/2-r,F=[[d,h],[d,h],[w,d],[w,d],[w,h],[w,h]],n=p.count/6;
+  for(let i=0;i<p.count;i++){v.fromBufferAttribute(p,i);c.set(Math.max(-hw,Math.min(hw,v.x)),Math.max(-hh,Math.min(hh,v.y)),Math.max(-hd,Math.min(hd,v.z)));v.sub(c).setLength(r).add(c);p.setXYZ(i,v.x,v.y,v.z);const q=F[Math.floor(i/n)];u.setXY(i,u.getX(i)*q[0],u.getY(i)*q[1])}
+  g.computeVertexNormals();return g}
+const tx=f=>{const c=document.createElement('canvas');c.width=c.height=16;const x=c.getContext('2d');for(let j=0;j<16;j++)for(let i=0;i<16;i++){const q=f(i,j),a=Array.isArray(q)?q:[q,q,q];x.fillStyle='rgb('+a.map(k=>Math.max(0,Math.min(255,k|0))).join(',')+')';x.fillRect(i,j,1,1)}const t=new THREE.CanvasTexture(c);t.magFilter=t.minFilter=THREE.NearestFilter;t.wrapS=t.wrapT=THREE.RepeatWrapping;return t};
+const R=n=>Math.random()*n;
+const TK=tx((i,j)=>(i%2?214:246)-R(12)),TD=tx((i,j)=>212+((i+j)%4?0:26)-R(26)),TH=tx((i,j)=>165+(i%3?0:24)+R(34)),TS=tx(()=>242-R(14));
+const M=(c,t)=>new THREE.MeshStandardMaterial({color:c,roughness:.8,map:t||null});
 function add(geo,mat,p,par,r){const m=new THREE.Mesh(geo,mat);m.position.set(...p);if(r)m.rotation.set(...r);m.castShadow=true;par.add(m);return m}
 
 function mkMike(x,rot){
   const g=new THREE.Group();g.position.x=x;g.rotation.y=rot;
-  const skin=M(0xe8935a),hair=M(0x0c0c0e),shirt=M(0x141416),pants=M(0x12295a),shoe=M(0xece6da),blk=M(0x050505),red=M(0xd9453a);
-  const bx=(w,h,d,mat,p,par)=>add(new THREE.BoxGeometry(w,h,d),mat,p,par||g);
+  const skin=M(0xf0a066,TS),hair=M(0x17171b,TH),shirt=M(0x25252b,TK),pants=M(0x1c3a78,TD),shoe=M(0xf4efe6,TS),blk=M(0x050505),red=M(0xe0503f);
+  const bx=(w,h,d,mat,p,par)=>add(RB(w,h,d),mat,p,par||g);
   for(const s of[-1,1]){bx(.45,1.1,.5,pants,[s*.25,.55,0]);bx(.47,.2,.62,shoe,[s*.25,.1,.06])}
   bx(1,1.2,.6,shirt,[0,1.7,0]);
   const head=new THREE.Group();head.position.y=2.95;g.add(head);
-  add(new THREE.BoxGeometry(1.3,1.3,1.3),[skin,skin,hair,skin,skin,hair],[0,0,0],head);
+  add(RB(1.3,1.3,1.3),[skin,skin,hair,skin,skin,hair],[0,0,0],head);
   bx(1.38,.5,1.38,hair,[0,.55,0],head);bx(1.38,.9,.3,hair,[0,.15,-.54],head);bx(.9,.25,.9,hair,[.15,.92,-.05],head);
   bx(.9,.2,.16,hair,[.22,.38,.66],head);bx(.4,.16,.16,hair,[.5,.22,.66],head);
   
   for(const s of[-1,1]){bx(.08,.3,.2,skin,[s*.69,-.05,0],head);bx(.2,.05,.06,blk,[s*.32,.2,.68],head)}
   const eyes=[];
-  for(const s of[-1,1]){const e=new THREE.Group();e.position.set(s*.32,-.02,.67);head.add(e);bx(.14,.28,.04,blk,[0,0,0],e);eyes.push(e)}
+  for(const s of[-1,1]){const e=new THREE.Group();e.position.set(s*.32,-.02,.67);head.add(e);bx(.14,.28,.04,blk,[0,0,0],e);bx(.05,.07,.045,M(0xffffff),[.03,.07,.01],e);eyes.push(e)}
   bx(.16,.14,.1,skin,[0,-.15,.7],head);
   const mouth=bx(.4,.2,.04,red,[0,-.26,.71],head);mouth.scale.set(1,.1,1);
   const arms=[];
@@ -53,20 +63,32 @@ function mkMike(x,rot){
 
 function mkBot(x,rot){
   const g=new THREE.Group();g.position.x=x;g.rotation.y=rot;g.scale.setScalar(1.5);
-  const om=new THREE.MeshStandardMaterial({color:0xd9774e,roughness:.75}),dk=new THREE.MeshStandardMaterial({color:0x1a0e08,roughness:.75});
-  for(const sx of[-.55,-.2,.2,.55])add(new THREE.BoxGeometry(.2,.4,.2),om,[sx,.2,0],g);
+  const om=new THREE.MeshStandardMaterial({color:0xe0784a,roughness:.5,emissive:0x3a1405}),dk=new THREE.MeshStandardMaterial({color:0x1a0e08,roughness:.75});
+  for(const sx of[-.55,-.2,.2,.55])add(RB(.2,.4,.2),om,[sx,.2,0],g);
   const head=new THREE.Group();head.position.y=.95;g.add(head);
-  add(new THREE.BoxGeometry(1.7,1.1,.95),om,[0,0,0],head);
+  add(RB(1.7,1.1,.95),om,[0,0,0],head);
   const eyes=[];
-  for(const s of[-1,1]){const e=new THREE.Group();e.position.set(s*.4,.12,.48);head.add(e);add(new THREE.BoxGeometry(.18,.34,.06),dk,[0,0,0],e);eyes.push(e)}
-  const mouth=add(new THREE.BoxGeometry(.36,.2,.05),dk,[0,-.2,.48],head);mouth.scale.y=.1;
+  for(const s of[-1,1]){const e=new THREE.Group();e.position.set(s*.4,.12,.48);head.add(e);add(RB(.18,.34,.06),dk,[0,0,0],e);eyes.push(e)}
+  const mouth=add(RB(.36,.2,.05),dk,[0,-.2,.48],head);mouth.scale.y=.1;
   const arms=[];
-  for(const s of[-1,1]){const p=new THREE.Group();p.position.set(s*.98,1.15,0);g.add(p);add(new THREE.BoxGeometry(.22,.5,.22),om,[0,-.2,0],p);arms.push(p)}
+  for(const s of[-1,1]){const p=new THREE.Group();p.position.set(s*.98,1.15,0);g.add(p);add(RB(.22,.5,.22),om,[0,-.2,0],p);arms.push(p)}
   S.add(g);return{g,head,eyes,mouth,arms,pitch:.6,ph:Math.random()*9,blink:0,nb:2,fy:2,bot:true,hov:.55}
 }
 
-const plat=new THREE.Mesh(new THREE.BoxGeometry(6.6,.3,3.2),new THREE.MeshStandardMaterial({color:0x8a6a45,roughness:.9}));plat.position.y=-.15;S.add(plat);
+const GR=tx((i,j)=>[88+R(30),150+R(40),48+R(20)]),DT=tx((i,j)=>R(10)<1?[95,70,48]:[121+R(25),85+R(20),55+R(15)]);
+const SD=tx((i,j)=>j<3||(j==3&&i%3==0)?[88+R(30),150+R(40),48+R(20)]:(R(10)<1?[95,70,48]:[121+R(25),85+R(20),55+R(15)]));
+const mm=t=>new THREE.MeshStandardMaterial({map:t,roughness:.95});
+const plat=new THREE.Mesh(RB(6.6,1,3.2,.06),[mm(SD),mm(SD),mm(GR),mm(DT),mm(SD),mm(SD)]);plat.position.y=-.5;plat.castShadow=true;S.add(plat);
+const torches=[];
+for(const x of[-3,3]){const st=new THREE.Mesh(RB(.18,.9,.18,.03),M(0x6b4a2b,TH));st.position.set(x,.45,-1.3);st.castShadow=true;S.add(st);
+  const fl=new THREE.Mesh(RB(.24,.24,.24,.04),new THREE.MeshStandardMaterial({color:0xffb347,emissive:0xff8a1f,emissiveIntensity:2}));fl.position.set(x,1,-1.3);S.add(fl);
+  const pl=new THREE.PointLight(0xff9a3c,1.2,1.4);pl.position.set(x,1.2,-1.1);S.add(pl);torches.push(pl)}
+const NP=70,pp=new Float32Array(NP*3),pv=[];
+for(let i=0;i<NP;i++){pp[i*3]=(Math.random()-.5)*7;pp[i*3+1]=Math.random()*5;pp[i*3+2]=(Math.random()-.5)*3.6;pv.push(.3+Math.random()*.6)}
+const pg=new THREE.BufferGeometry();pg.setAttribute('position',new THREE.BufferAttribute(pp,3));
+S.add(new THREE.Points(pg,new THREE.PointsMaterial({color:0xffc27a,size:.012,transparent:true,opacity:.85,depthWrite:false})));
 const A=mkMike(-1.8,Math.PI/2),B=mkBot(1.8,-Math.PI/2);
+const gl=new THREE.PointLight(0xff8a4a,1.6,1.1);gl.position.set(0,-.2,0);B.g.add(gl);
 const ch={Mike:A,Clawd:B},col={Mike:'#e8935a',Clawd:'#d9774e'};
 let speaker=null,lvl=-1,tok=0,vl=[],src=null,ctx=null,armed=false;
 const EX=[[[1,1,0],[1,1,0]],[[1.3,.45,0],[1.3,.45,0]],[[1.2,1.45,0],[1.2,1.45,0]],[[1,1.3,0],[1,.7,.15]],[[1,.9,.35],[1,.9,-.35]]];
@@ -137,5 +159,5 @@ const clk=new THREE.Clock();
 (function loop(){requestAnimationFrame(loop);const dt=Math.min(clk.getDelta(),.05),t=clk.elapsedTime;
   if(src&&src.ready&&ctx)ctx.update(src.domElement);
   if(armed&&root.visible){armed=false;txt.textContent='';setTimeout(()=>play(0),600)}
-  anim(A,t,dt);anim(B,t,dt);renderer.render(scene,camera)})();
+  anim(A,t,dt);anim(B,t,dt);torches.forEach((l,i)=>{l.intensity=1.1+Math.sin(t*9+i*2)*.25+Math.random()*.1});for(let i=0;i<NP;i++){pp[i*3+1]+=pv[i]*dt;if(pp[i*3+1]>5)pp[i*3+1]=0}pg.attributes.position.needsUpdate=true;renderer.render(scene,camera)})();
 </script></body></html>

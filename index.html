@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mike y Clawd · Realidad aumentada</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#000;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+#hud{position:fixed;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:10;display:flex;flex-direction:column;gap:8px;max-width:640px;margin:0 auto;color:#fff}
+#sub{background:rgba(10,12,20,.82);border-radius:14px;padding:12px 14px;font-size:17px;line-height:1.35}
+#who{display:block;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px}
+button{background:#d9774e;color:#fff;border:0;border-radius:12px;padding:14px;font-size:16px;font-weight:600}
+#hud a{color:#9fc4ff;font-size:13px;text-align:center}
+</style></head><body>
+<div id="hud"><div id="sub"><span id="who"></span><span id="txt">Pulsa «Activar cámara» y apunta al marcador Hiro.</span></div>
+<button id="go">📷 Activar cámara</button>
+<a href="https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/images/hiro.png" target="_blank" rel="noopener">Ver marcador Hiro para imprimir</a></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@ar-js-org/ar.js@3.4.5/three.js/build/ar-threex.js"></script>
+<script>
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+renderer.setClearColor(0x000000,0);renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+Object.assign(renderer.domElement.style,{position:'absolute',top:'0',left:'0',zIndex:'5'});
+document.body.appendChild(renderer.domElement);
+const scene=new THREE.Scene(),camera=new THREE.Camera();scene.add(camera);
+scene.add(new THREE.AmbientLight(0xffffff,.75));
+const dl=new THREE.DirectionalLight(0xffffff,.9);dl.position.set(1,3,2);scene.add(dl);
+const root=new THREE.Group();root.visible=false;scene.add(root);
+const S=new THREE.Group();S.scale.setScalar(.15);root.add(S);
+const M=c=>new THREE.MeshStandardMaterial({color:c,roughness:.75});
+function add(geo,mat,p,par,r){const m=new THREE.Mesh(geo,mat);m.position.set(...p);if(r)m.rotation.set(...r);m.castShadow=true;par.add(m);return m}
+
+function mkMike(x,rot){
+  const g=new THREE.Group();g.position.x=x;g.rotation.y=rot;
+  const skin=M(0xe8935a),hair=M(0x0c0c0e),shirt=M(0x141416),pants=M(0x12295a),shoe=M(0xece6da),blk=M(0x050505),red=M(0xd9453a);
+  const bx=(w,h,d,mat,p,par)=>add(new THREE.BoxGeometry(w,h,d),mat,p,par||g);
+  for(const s of[-1,1]){bx(.45,1.1,.5,pants,[s*.25,.55,0]);bx(.47,.2,.62,shoe,[s*.25,.1,.06])}
+  bx(1,1.2,.6,shirt,[0,1.7,0]);
+  const head=new THREE.Group();head.position.y=2.95;g.add(head);
+  add(new THREE.BoxGeometry(1.3,1.3,1.3),[skin,skin,hair,skin,skin,hair],[0,0,0],head);
+  bx(1.38,.5,1.38,hair,[0,.55,0],head);bx(1.38,.9,.3,hair,[0,.15,-.54],head);bx(.9,.25,.9,hair,[.15,.92,-.05],head);
+  bx(.9,.2,.16,hair,[.22,.38,.66],head);bx(.4,.16,.16,hair,[.5,.22,.66],head);
+  
+  for(const s of[-1,1]){bx(.08,.3,.2,skin,[s*.69,-.05,0],head);bx(.2,.05,.06,blk,[s*.32,.2,.68],head)}
+  const eyes=[];
+  for(const s of[-1,1]){const e=new THREE.Group();e.position.set(s*.32,-.02,.67);head.add(e);bx(.14,.28,.04,blk,[0,0,0],e);eyes.push(e)}
+  bx(.16,.14,.1,skin,[0,-.15,.7],head);
+  const mouth=bx(.4,.2,.04,red,[0,-.26,.71],head);mouth.scale.set(1,.1,1);
+  const arms=[];
+  for(const s of[-1,1]){const p=new THREE.Group();p.position.set(s*.72,2.2,0);g.add(p);bx(.42,.85,.42,shirt,[0,-.425,0],p);bx(.42,.35,.42,skin,[0,-1.025,0],p);arms.push(p)}
+  S.add(g);return{g,head,eyes,mouth,arms,pitch:.9,ph:Math.random()*9,blink:0,nb:2,fy:2.6}
+}
+
+function mkBot(x,rot){
+  const g=new THREE.Group();g.position.x=x;g.rotation.y=rot;g.scale.setScalar(1.5);
+  const om=new THREE.MeshStandardMaterial({color:0xd9774e,roughness:.75}),dk=new THREE.MeshStandardMaterial({color:0x1a0e08,roughness:.75});
+  for(const sx of[-.55,-.2,.2,.55])add(new THREE.BoxGeometry(.2,.4,.2),om,[sx,.2,0],g);
+  const head=new THREE.Group();head.position.y=.95;g.add(head);
+  add(new THREE.BoxGeometry(1.7,1.1,.95),om,[0,0,0],head);
+  const eyes=[];
+  for(const s of[-1,1]){const e=new THREE.Group();e.position.set(s*.4,.12,.48);head.add(e);add(new THREE.BoxGeometry(.18,.34,.06),dk,[0,0,0],e);eyes.push(e)}
+  const mouth=add(new THREE.BoxGeometry(.36,.2,.05),dk,[0,-.2,.48],head);mouth.scale.y=.1;
+  const arms=[];
+  for(const s of[-1,1]){const p=new THREE.Group();p.position.set(s*.98,1.15,0);g.add(p);add(new THREE.BoxGeometry(.22,.5,.22),om,[0,-.2,0],p);arms.push(p)}
+  S.add(g);return{g,head,eyes,mouth,arms,pitch:.6,ph:Math.random()*9,blink:0,nb:2,fy:2,bot:true,hov:.55}
+}
+
+const plat=new THREE.Mesh(new THREE.BoxGeometry(6.6,.3,3.2),new THREE.MeshStandardMaterial({color:0x8a6a45,roughness:.9}));plat.position.y=-.15;S.add(plat);
+const A=mkMike(-1.8,Math.PI/2),B=mkBot(1.8,-Math.PI/2);
+const ch={Mike:A,Clawd:B},col={Mike:'#e8935a',Clawd:'#d9774e'};
+let speaker=null,lvl=-1,tok=0,vl=[],src=null,ctx=null,armed=false;
+const EX=[[[1,1,0],[1,1,0]],[[1.3,.45,0],[1.3,.45,0]],[[1.2,1.45,0],[1.2,1.45,0]],[[1,1.3,0],[1,.7,.15]],[[1,.9,.35],[1,.9,-.35]]];
+
+const L=[["Mike","Clawd, mira a tu alrededor. Estamos en un cuarto, con el espacio de fondo. ¿Cómo es posible?"],
+["Clawd","Es que Claude escribió el código que nos construye, con luces, personajes y cámara."],
+["Mike","¿Todo esto salió de una conversación? Parece magia."],
+["Clawd","Claude describe cada pieza con código, y el navegador la dibuja en tres dimensiones."],
+["Mike","¿Y los movimientos, las voces y los cortes de cámara?"],
+["Clawd","También son código. Cada gesto es una instrucción, y se puede cambiar cuando quieras."],
+["Mike","Entonces, ¿de verdad no hay magia?"],
+["Clawd","No es magia, es programación."]];
+
+function anim(c,t,dt){
+  const sp=speaker&&ch[speaker]===c,lis=speaker&&!sp;
+  const k=sp?(lvl>=0?.12+Math.min(1,lvl*6):(.25+.8*Math.abs(Math.sin(t*13+c.ph))*(.6+.4*Math.sin(t*4.1)))):.1;
+  c.mouth.scale.y+=(k-c.mouth.scale.y)*Math.min(1,dt*18);
+  c.g.position.y=(c.hov||0)+(c.bot?Math.sin(t*1.8+c.ph)*.12:0)+(sp?Math.abs(Math.sin(t*4))*.05:Math.sin(t*1.5+c.ph)*.015);c.g.rotation.z=c.bot?Math.sin(t*1.3+c.ph)*.05:0;
+  c.head.rotation.x=sp?Math.sin(t*5)*.08:(lis?Math.sin(t*2.2)*.07:0);
+  c.head.rotation.y=sp?Math.sin(t*1.7)*.12:(lis?Math.sin(t*.9)*.05:0);
+  const ra=c.arms[1],la=c.arms[0];
+  const tr=sp?-.9+Math.sin(t*3.2)*.55:0,tl=sp?-.5+Math.sin(t*2.6+1)*.45:0;
+  ra.rotation.x+=(tr-ra.rotation.x)*Math.min(1,dt*6);la.rotation.x+=(tl-la.rotation.x)*Math.min(1,dt*6);
+  ra.rotation.z=sp?-.25:-.1+Math.sin(t+c.ph)*.03;la.rotation.z=sp?.25:.1-Math.sin(t+c.ph)*.03;
+  c.nb-=dt;if(c.nb<0){c.blink=.14;c.nb=1.5+Math.random()*3}
+  c.blink=Math.max(0,c.blink-dt);const by=c.blink>0?.1:1;
+  const E=c.bot&&sp?EX[Math.floor(t*.8+c.ph)%EX.length]:EX[0],f=Math.min(1,dt*10);c.ey=c.ey||[1,1];
+  c.eyes.forEach((e,j)=>{const q=E[j];e.scale.x+=(q[0]-e.scale.x)*f;c.ey[j]+=(q[1]-c.ey[j])*f;e.rotation.z+=(q[2]-e.rotation.z)*f;e.scale.y=c.ey[j]*by});
+}
+
+const who=document.getElementById('who'),txt=document.getElementById('txt'),go=document.getElementById('go');
+function loadV(){const a=speechSynthesis.getVoices().filter(v=>v.lang.toLowerCase().startsWith('es'));if(a.length)vl=a}
+if('speechSynthesis' in window){speechSynthesis.onvoiceschanged=loadV;loadV()}
+function play(i){
+  const t=++tok;
+  if(i>=L.length){speaker=null;who.textContent='';txt.textContent='Fin de la escena.';go.style.display='block';go.textContent='↻ Repetir';return}
+  const[n,s]=L[i];speaker=n;who.textContent=n;who.style.color=col[n];txt.textContent=s;
+  let done=false;const next=()=>{if(done||t!==tok)return;done=true;speaker=null;setTimeout(()=>t===tok&&play(i+1),700)};
+  const dur=Math.max(1800,s.length*65);
+  if('speechSynthesis' in window){speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(s);const v=vl.length?(n==='Mike'?vl[0]:(vl[1]||vl[0])):null;if(v){u.voice=v;u.lang=v.lang}else u.lang='es-ES';u.pitch=n==='Mike'?.9:.6;u.onend=next;speechSynthesis.speak(u);setTimeout(next,dur+4000)}
+  else setTimeout(next,dur);
+}
+function onResize(){if(!src)return;src.onResizeElement();src.copyElementSizeTo(renderer.domElement);if(ctx&&ctx.arController!==null)src.copyElementSizeTo(ctx.arController.canvas)}
+addEventListener('resize',onResize);addEventListener('orientationchange',()=>setTimeout(onResize,400));
+function initAR(){
+  src=new THREEx.ArToolkitSource({sourceType:'webcam'});
+  src.init(()=>setTimeout(onResize,1500),()=>{txt.textContent='No se pudo abrir la cámara. Revisa el permiso y que la página use https.';go.style.display='block';armed=false});
+  ctx=new THREEx.ArToolkitContext({cameraParametersUrl:'https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@master/data/data/camera_para.dat',detectionMode:'mono'});
+  ctx.init(()=>camera.projectionMatrix.copy(ctx.getProjectionMatrix()));
+  new THREEx.ArMarkerControls(ctx,root,{type:'pattern',patternUrl:'https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@master/data/data/patt.hiro',smooth:true,smoothCount:5,smoothTolerance:.01,smoothThreshold:2});
+  armed=true;
+}
+go.onclick=()=>{
+  go.style.display='none';
+  if(src){armed=true;txt.textContent='Apunta al marcador…';return}
+  try{speechSynthesis.speak(new SpeechSynthesisUtterance(''))}catch(e){}
+  txt.textContent='Abriendo cámara… apunta al marcador Hiro.';initAR();
+};
+const clk=new THREE.Clock();
+(function loop(){requestAnimationFrame(loop);const dt=Math.min(clk.getDelta(),.05),t=clk.elapsedTime;
+  if(src&&src.ready&&ctx)ctx.update(src.domElement);
+  if(armed&&root.visible){armed=false;txt.textContent='';setTimeout(()=>play(0),600)}
+  anim(A,t,dt);anim(B,t,dt);renderer.render(scene,camera)})();
+</script></body></html>

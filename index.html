@@ -109,9 +109,12 @@ function play(i){
 }
 function onResize(){if(!src)return;src.onResizeElement();src.copyElementSizeTo(renderer.domElement);if(ctx&&ctx.arController!==null)src.copyElementSizeTo(ctx.arController.canvas)}
 addEventListener('resize',onResize);addEventListener('orientationchange',()=>setTimeout(onResize,400));
+function fit(){let n=0;onResize();const iv=setInterval(()=>{onResize();if(++n>40)clearInterval(iv)},500)}
+if(window.visualViewport)visualViewport.addEventListener('resize',onResize);
 function initAR(){
   src=new THREEx.ArToolkitSource({sourceType:'webcam'});
-  src.init(()=>setTimeout(onResize,1500),()=>{txt.textContent='No se pudo abrir la cámara. Revisa el permiso y que la página use https.';go.style.display='block';armed=false});
+  src.init(fit,()=>{txt.textContent='No se pudo abrir la cámara. Revisa el permiso y que la página use https.';go.style.display='block';armed=false});
+  if(src.domElement)['loadedmetadata','loadeddata','playing','resize'].forEach(e=>src.domElement.addEventListener(e,onResize));
   ctx=new THREEx.ArToolkitContext({cameraParametersUrl:'https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@master/data/data/camera_para.dat',detectionMode:'mono'});
   ctx.init(()=>camera.projectionMatrix.copy(ctx.getProjectionMatrix()));
   new THREEx.ArMarkerControls(ctx,root,{type:'pattern',patternUrl:'https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@master/data/data/patt.hiro',smooth:true,smoothCount:5,smoothTolerance:.01,smoothThreshold:2});
